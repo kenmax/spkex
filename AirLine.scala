@@ -57,8 +57,9 @@ object AirLine {
 //    airLineRegex(args, sc)
 //    airLineSql(sc)
 
-    //
-    sparkReducesideJoin(sc)
+    //Spark Join example
+//    sparkReducesideJoin(sc)
+    sparkMapsideJoin(sc)
 
     sc.stop()
     val spTime = System.currentTimeMillis()
@@ -135,6 +136,35 @@ object AirLine {
 //    val output = "d:/wordcount-" + System.currentTimeMillis();
 //    result.saveAsTextFile(output) //save result to local file or HDFS
 
+  }
+
+  def sparkMapsideJoin (sc: SparkContext): Unit = {
+    // table1 is smaller, so broadcast it as a map<String, String>
+    val table1 = sc.parallelize(l1)
+    val table2 = sc.parallelize(l2)
+
+    val pairs = table1.map { x =>
+      val pos = x.indexOf(',')
+      (x.substring(0, pos), x.substring(pos + 1))
+    }.collectAsMap
+    val broadCastMap = sc.broadcast(pairs) //save table1 as map, and broadcast it
+
+    // table2 join table1 in map side
+    val result = table2.map { x =>
+      val pos = x.indexOf(',')
+      (x.substring(0, pos), x.substring(pos + 1))
+    }.mapPartitions({ iter =>
+      val m = broadCastMap.value
+      for {
+        (key, value) <- iter
+        if (m.contains(key))
+      } yield (key, (value, m.get(key).getOrElse("")))
+    })
+
+    result.collect().foreach(println)
+
+//    val output = "d:/wordcount-" + System.currentTimeMillis() ;
+//    result.saveAsTextFile(output) //save result to local file or HDFS
   }
 
 }
